@@ -160,6 +160,10 @@ input[type=number],input[type=text],select{font-family:var(--f-ui);font-size:13p
       <div class="tb"><span id="t-prof">PROFILE.EXE</span><span class="x"><i>_</i><i>□</i><i>×</i></span></div>
       <form class="wb" id="prof">
         <div class="ex" id="exnote">Loaded with an <b>example profile</b>. Swap in your own info and hit MATCH ME.</div>
+        <fieldset><legend>Where in the World?</legend>
+          <label for="where">I'm interested in<select id="where"><option value="any">Anywhere on Earth</option></select></label>
+          <p class="note">Pick a region or country and the globe flies there. Matches stay inside it.</p>
+        </fieldset>
         <fieldset><legend>About U</legend>
           <div class="row">
             <label for="age">Age<input id="age" type="number" min="18" max="99" value="29"></label>
@@ -401,13 +405,15 @@ const CONTS = {"Europe":[15,-48],"Asia":[-105,-20],"N. America":[95,-25],"S. Ame
 const CLIM = {dry:{d:9,m:4,t:-3,c:0},warm:{t:8,m:4,d:2,c:-4},mild:{m:8,c:3,t:1,d:1},seasons:{c:8,m:2,t:-4,d:-2},any:{}};
 
 /* ---------- SCORING ---------- */
+function inWhere(w,id,c){ if(!w||w==="any")return true; if(w.startsWith("r:"))return c.k===w.slice(2); if(w.startsWith("c:"))return id===w.slice(2); return true; }
+function whereLabel(w){ if(!w||w==="any")return ""; if(w.startsWith("r:"))return " in "+w.slice(2); return " in "+(C[w.slice(2)]?.n||""); }
 const PLAB={nomad:"digital nomad",retiree:"retiree",fire:"early retiree",fresh:"fresh-starter",adventure:"adventurer",family:"family with kids",student:"student",founder:"founder",teacher:"English teacher",creative:"creative",partner:"love-chaser",other:"one-of-a-kind expat"};
 const TEFL=new Set(["410","392","704","764","170","484","076","032","360","792","203","380","724","218","268"]);
 function kwFlags(t){ t=(t||"").toLowerCase(); const m={beach:/beach|ocean|surf|island|coast|sea\b/,cheap:/cheap|budget|afford|low.cost|save money|frugal/,night:/party|club|nightlife|bars?\b|danc/,safety:/safe|quiet|calm|peace/,health:/health|doctor|hospital|medical|dental|clinic/,english:/english/,nature:/mountain|hik|ski|nature|forest|outdoor|jungle/,culture:/food|art|culture|histor|museum|music|wine|cuisine/,love:/love|wife|husband|partner|marr|girlfriend|boyfriend|romance/,nomads:/expat|community|remote|nomad|cowork|laptop/,retire:/retir|pension|social security/,family:/kid|child|family|school/}; return Object.keys(m).filter(k=>m[k].test(t)); }
 function climFromText(t){ t=(t||"").toLowerCase(); if(!t)return "any"; if(/dry|desert|arid|no humid/.test(t))return "dry"; if(/mild|spring|mediterr|breez|temperate|not too hot|cool night/.test(t))return "mild"; if(/snow|cold|winter|season|fall|autumn|cool/.test(t))return "seasons"; if(/hot|warm|tropic|sun|heat|beach/.test(t))return "warm"; return "any"; }
 function readProfile(){
   const v=id=>document.getElementById(id).value;
-  return {age:+v("age")||30,gender:v("gender"),ht:((+v("htf")||5)*12+(+v("hti")||0)),wt:+v("wt")||0,inc:+v("inc")||0,persona:v("persona"),climate:v("climate"),personaTxt:v("persona")==="other"?v("personaTxt").trim():"",climateTxt:v("climate")==="other"?v("climateTxt").trim():"",
+  return {age:+v("age")||30,gender:v("gender"),ht:((+v("htf")||5)*12+(+v("hti")||0)),wt:+v("wt")||0,inc:+v("inc")||0,where:v("where"),persona:v("persona"),climate:v("climate"),personaTxt:v("persona")==="other"?v("personaTxt").trim():"",climateTxt:v("climate")==="other"?v("climateTxt").trim():"",
     seek:v("seek"),intent:v("intent"),reasons:[...new Set([...document.querySelectorAll("#reasons input:checked")].map(i=>i.value).concat(v("persona")==="other"?kwFlags(v("personaTxt")):[]))]};
 }
 function queer(p){ if(p.seek==="none")return false; if(p.gender==="nb")return true; return p.seek==="all"||(p.gender==="m"&&p.seek==="m")||(p.gender==="w"&&p.seek==="w"); }
@@ -446,9 +452,9 @@ function cityScore(p,c,ci){
   return {s,cost,ratio};
 }
 let RESULTS=[], COUNTRY_BEST={};
-function runMatch(){
+function runMatch(fly=true){
   const p=readProfile(); const out=[];
-  for(const [id,c] of Object.entries(C)) c.cities.forEach((ci,i)=>{ const r=cityScore(p,c,ci); out.push({id,i,c,ci,...r}); });
+  for(const [id,c] of Object.entries(C)){ if(!inWhere(p.where,id,c))continue; c.cities.forEach((ci,i)=>{ const r=cityScore(p,c,ci); out.push({id,i,c,ci,...r}); }); }
   out.sort((a,b)=>b.s-a.s);
   const max=out[0].s, min=out[out.length-1].s;
   out.forEach(o=>o.pct=Math.max(8,Math.round(30+(o.s-min)/(max-min||1)*68)));
@@ -456,8 +462,8 @@ function runMatch(){
   out.forEach(o=>{ if(!(o.id in COUNTRY_BEST)) COUNTRY_BEST[o.id]=o; });
   const ranked=Object.values(COUNTRY_BEST).sort((a,b)=>b.s-a.s); ranked.forEach((o,i)=>o.crank=i);
   renderList(p); paintGlobe();
-  const top=out[0]; flyTo([top.ci[2],top.ci[1]],2.2); showCity(top);
-  document.getElementById("hud").textContent="MATCH FOUND: "+top.ci[0].toUpperCase();
+  const top=out[0]; if(fly)flyTo([top.ci[2],top.ci[1]],2.2); showCity(top);
+  if(fly)document.getElementById("hud").textContent="MATCH FOUND: "+top.ci[0].toUpperCase();
 }
 
 /* ---------- RESULTS UI ---------- */
@@ -465,7 +471,7 @@ const $=s=>document.querySelector(s);
 function fmt$(n){return "$"+(Math.round(n/50)*50).toLocaleString("en-US")}
 function renderList(p){
   const per=PLAB[p.persona];
-  $("#sumline").textContent=`Top cities for a ${p.age}-year-old ${per} on ${fmt$(p.inc)}/mo:`;
+  $("#sumline").textContent=`Top cities${whereLabel(p.where)} for a ${p.age}-year-old ${per} on ${fmt$(p.inc)}/mo:`;
   const L=$("#list"); L.innerHTML="";
   RESULTS.slice(0,12).forEach((o,i)=>{
     const b=document.createElement("button"); b.className="item"; b.type="button"; b.setAttribute("role","listitem");
@@ -574,13 +580,26 @@ let last=0; d3.timer(t=>{ const dt=t-last; last=t; if(spinning&&!flying&&!matchM
 Object.entries(CONTS).forEach(([k,[lon,lat]])=>{ const b=document.createElement("button"); b.className="btn"; b.type="button"; b.textContent=k; b.onclick=()=>{ flyTo([-lon,-lat],1.7); $("#hud").textContent="NOW VIEWING: "+k.toUpperCase(); }; $("#conts").appendChild(b); });
 const wb=document.createElement("button"); wb.className="btn"; wb.type="button"; wb.textContent="Whole World"; wb.onclick=()=>{flyToZoom(1); $("#hud").textContent="SPINNING...";}; $("#conts").appendChild(wb);
 new ResizeObserver(size).observe(stage);
+(function(){ const sel=$("#where");
+  const g1=document.createElement("optgroup"); g1.label="Regions";
+  Object.keys(CONTS).forEach(k=>{ const o=document.createElement("option"); o.value="r:"+k; o.textContent=k==="N. America"?"North America & Caribbean":k==="S. America"?"South America":k; g1.appendChild(o); });
+  const g2=document.createElement("optgroup"); g2.label="Countries";
+  Object.entries(C).sort((a,b)=>a[1].n.localeCompare(b[1].n)).forEach(([id,c])=>{ const o=document.createElement("option"); o.value="c:"+id; o.textContent=c.n; g2.appendChild(o); });
+  sel.append(g1,g2);
+  sel.addEventListener("change",()=>{ const w=sel.value; SEL=null;
+    if(w.startsWith("r:")){ const [lon,lat]=CONTS[w.slice(2)]; flyTo([-lon,-lat],1.7); $("#hud").textContent="NOW VIEWING: "+w.slice(2).toUpperCase(); }
+    else if(w.startsWith("c:")){ const f=countries.find(d=>d.id===w.slice(2)); const ctr=f?d3.geoCentroid(f):[C[w.slice(2)].cities[0][2],C[w.slice(2)].cities[0][1]]; flyTo(ctr,2.4); $("#hud").textContent="NOW VIEWING: "+C[w.slice(2)].n.toUpperCase(); }
+    else { flyToZoom(1); $("#hud").textContent="SPINNING..."; }
+    runMatch(false);
+  });
+})();
 
 $("#prof").addEventListener("submit",e=>{e.preventDefault(); $("#exnote").hidden=true; runMatch(); try{localStorage.setItem("eom-profile",JSON.stringify(readProfile()))}catch(_){} });
-try{ const sp=JSON.parse(localStorage.getItem("eom-profile")||"null"); if(sp){ ["age","gender","wt","inc","persona","climate","seek","intent","personaTxt","climateTxt"].forEach(k=>{ if(sp[k]!=null) document.getElementById(k).value=sp[k]; }); if(sp.ht){ document.getElementById("htf").value=Math.floor(sp.ht/12); document.getElementById("hti").value=sp.ht%12; } document.querySelectorAll("#reasons input").forEach(i=>i.checked=sp.reasons.includes(i.value)); $("#exnote").hidden=true; } }catch(_){}
+try{ const sp=JSON.parse(localStorage.getItem("eom-profile")||"null"); if(sp){ ["where","age","gender","wt","inc","persona","climate","seek","intent","personaTxt","climateTxt"].forEach(k=>{ if(sp[k]!=null) document.getElementById(k).value=sp[k]; }); if(sp.ht){ document.getElementById("htf").value=Math.floor(sp.ht/12); document.getElementById("hti").value=sp.ht%12; } document.querySelectorAll("#reasons input").forEach(i=>i.checked=sp.reasons.includes(i.value)); $("#exnote").hidden=true; } }catch(_){}
 document.getElementById("counter").textContent=String(42069+Math.floor(Date.now()/86400000)%9000).padStart(7,"0");
 function syncOther(){ $("#personaTxtL").hidden=$("#persona").value!=="other"; $("#climateTxtL").hidden=$("#climate").value!=="other"; }
 $("#persona").addEventListener("change",syncOther); $("#climate").addEventListener("change",syncOther); syncOther();
-size(); runMatch(); spinning=true; zoom=1; draw();
+size(); runMatch(); if($("#where").value==="any"){ spinning=true; zoom=1; draw(); }
 
 
 /* ---------- PIXEL MASCOTS ---------- */
@@ -672,7 +691,7 @@ size(); runMatch(); spinning=true; zoom=1; draw();
     const p=readProfile(); const fax=$("#fax"); fax.hidden=false;
     let n=0; fax.textContent="*** DIALING ORACLE ***"; const dial=setInterval(()=>{n=(n+1)%4; fax.textContent="*** DIALING ORACLE"+".".repeat(n)+" ***";},350);
     const top=RESULTS.slice(0,6).map((o,i)=>`${i+1}. ${o.ci[0]}, ${o.c.n} (${o.pct}% match, est ${fmt$(o.cost)}/mo; visas: nomad=${o.c.nv||"none"}, retire=${o.c.rv||"none"}; dating notes: ${o.c.dl})`).join("\n");
-    const profile={age:p.age,gender:({m:"man",w:"woman",nb:"non-binary"})[p.gender],height:`${Math.floor(p.ht/12)} ft ${p.ht%12} in`,weight:p.wt,income:p.inc,
+    const profile={where:p.where==="any"?"anywhere":whereLabel(p.where).slice(4),age:p.age,gender:({m:"man",w:"woman",nb:"non-binary"})[p.gender],height:`${Math.floor(p.ht/12)} ft ${p.ht%12} in`,weight:p.wt,income:p.inc,
       persona:PLAB[p.persona]+(p.personaTxt?" ("+p.personaTxt+")":""),climate:p.climate+(p.climateTxt?" ("+p.climateTxt+")":""),reasons:p.reasons.join(", "),seek:p.seek,intent:p.intent};
     try{
       const r=await fetch("/api/oracle",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({profile,top})});

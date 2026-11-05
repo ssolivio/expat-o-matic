@@ -18,9 +18,10 @@ export default async function handler(req, res) {
 
   const { profile = {}, top = "" } = req.body || {};
   const p = {};
-  for (const k of ["age","gender","height","weight","income","persona","climate","reasons","seek","intent"]) p[k] = clip(profile[k], 200);
+  for (const k of ["where","age","gender","height","weight","income","persona","climate","reasons","seek","intent"]) p[k] = clip(profile[k], 200);
 
   const prompt = `You are the "Travel Oracle" on a playful 1999-style expat website. Write a personal relocation reading for this adult user in plain text (no markdown symbols), under 260 words, with a fun retro tone but genuinely useful advice.
+Region of interest: ${p.where || "anywhere"}.
 Profile: age ${p.age}, gender ${p.gender}, height ${p.height}, weight ${p.weight} lb, income $${p.income}/month after tax, persona: ${p.persona}, climate: ${p.climate}, reasons: ${p.reasons || "none given"}, interested in: ${p.seek}, looking for: ${p.intent}.
 Top matches from our scoring engine:
 ${clip(top, 3000)}
